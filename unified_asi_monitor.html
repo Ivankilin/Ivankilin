@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html lang="en" hx-boost="true" hx-target="body" hx-swap="outerHTML" data-theme="dark" data-lt-installed="true" class="wf-active">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unified ASI Monitor</title>
+
+    <!-- Script Libraries -->
+    <!-- TensorFlow.js (Prioritized: Snippet 1 - 4.22.0 with layers) -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-layers@4.22.0/dist/tf-layers.min.js"></script>
+
+    <!-- Three.js (Prioritized: r128 from Snippets 2 & 3) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- Math.js (Common in Snippets 1 & 2 - 9.4.4) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/9.4.4/math.js"></script>
+
+    <!-- Chart.js (From Snippet 2 & 3 - Snippet 3: 3.7.0) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+
+    <!-- Lodash (Common in Snippets 2 & 3 - 4.17.21) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+
+    <!-- p5.js (From Snippet 2 - 1.4.0) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+
+    <!-- dat.gui (From Snippet 2 - 0.7.9 module) -->
+    <script type="module" src="https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.module.js"></script>
+
+    <!-- D3.js (From Snippet 2 & 3 - Snippet 3: 7.8.5, Snippet 2: v7.min.js) Using 7.8.5 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+
+    <!-- htmx.js (From Snippet 3) -->
+    <!-- <script src="https://websim.ai/htmx.min.js" defer></script> --> <!-- Removed as per instruction -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script> <!-- Included from Snippet 3 -->
+
+    <!-- morphdom-swap.js (From Snippet 3) -->
+    <script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/morphdom-swap.js" defer></script> <!-- Updated src -->
+
+    <!-- CSS Links -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet"> <!-- From Snippet 2 -->
+    <!-- <link rel="stylesheet" href="https://websim.ai/common.css"> --> <!-- Commented out -->
+    <!-- <link rel="stylesheet" href="https://websim.ai/styles.css"> --> <!-- Commented out -->
+    <!-- <link rel="icon" type="image/x-icon" href="https://websim.ai/favicon.ico"> --> <!-- Commented out -->
+
+    <style>
+        /* Snippet 3 Base Styles (Primary Theme) */
+        :root {
+            --primary-bg: #0e0e10;
+            --secondary-bg: #1f1f23;
+            --accent-color: #00ffff; /* From Snippet 2, can be used by Snippet 3 components */
+            --text-color: #e0e0e0; /* Default text from Snippet 3 */
+            /* ... other CSS variables from Snippet 3 ... */
+        }
+
+        body {
+            margin: 0;
+            padding: 0; /* Added for consistency */
+            background: var(--primary-bg); /* Snippet 3 BG */
+            color: var(--text-color); /* Snippet 3 Text Color */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Snippet 3 Font */
+            min-height: 100vh;
+            overflow: hidden; /* Common across snippets */
+            line-height: 1.6; /* From Snippet 1, good default */
+        }
+
+        /* Snippet 2 Body Style (applied to a specific container if needed, or aspects merged) */
+        /* For now, Orbitron font is globally available, radial gradient might be for a specific viz section */
+        .orbitron-font-body { /* If a specific section needs Orbitron and snippet 2's BG */
+             font-family: 'Orbitron', monospace; /* Snippet 2 Font */
+             background: radial-gradient(circle, #000428 0%, #004e92 100%); /* Snippet 2 BG */
+             color: white; /* Snippet 2 Text Color */
+        }
+
+        /* Snippet 3 Main Layout */
+        .main-container {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 280px;
+            background: var(--secondary-bg);
+            padding: 15px; /* Added padding */
+            border-right: 1px solid var(--accent-color); /* Accent border */
+            overflow-y: auto; /* For scrollable content */
+            color: var(--text-color);
+        }
+        .sidebar h2 {
+            font-family: 'Orbitron', monospace; /* Use Orbitron for headings in sidebar */
+            color: var(--accent-color);
+        }
+
+        .content {
+            flex: 1;
+            position: relative; /* Important for absolute positioning of children */
+            overflow: hidden; /* Important for children like canvases */
+            display: flex; /* To help manage internal layout if needed */
+            flex-direction: column; /* Stack elements like status bar and main vis area */
+        }
+
+        /* General Canvas Style (from Snippet 1, adapted) */
+        /* This might be too general. Specific canvases are targeted below. */
+        /*
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+        */
+
+        /* Snippet 1: Quantum Interface */
+        #quantum-interface {
+            background: rgba(0,0,0,0.7);
+            border: 1px solid #0f0; /* Original green, can be changed to var(--accent-color) */
+            padding: 10px;
+            margin-bottom: 20px; /* Spacing in sidebar */
+            color: #0f0; /* Original green */
+            font-family: 'Courier New', monospace;
+        }
+        #quantum-interface h3 {
+            font-family: 'Orbitron', monospace;
+            color: #0f0;
+            margin-top: 0;
+        }
+
+
+        /* Snippet 2: Unified System Grid (Adapted to be part of .content) */
+        #unified-system {
+            /* This was a grid, now it will be a flexible part of .content */
+            /* display: grid; */
+            /* grid-template-areas: "visualization control" "status status"; */
+            /* grid-template-columns: 3fr 1fr; */
+            /* grid-template-rows: 9fr 1fr; */
+            position: relative; /* Changed from absolute to relative to fit flow */
+            width: 100%;
+            height: 100%; /* Take full space of its container in .content */
+            display: flex; /* Using flex to manage internal layout */
+            flex-direction: column; /* Default stacking */
+        }
+
+        /* Visualization Placeholders from Snippet 2 */
+        #quantum-visualization,
+        #neural-visualization {
+            /* grid-area: visualization; Snippet 2 grid style */
+            position: relative; /* Relative to parent */
+            width: 100%;
+            flex-grow: 1; /* Allow them to take space in a flex container */
+            border: 1px dashed var(--accent-color); /* For visibility */
+            margin-bottom: 5px; /* Spacing */
+        }
+        #quantumVisualizationCanvas { /* Canvas from Snippet 1, inside #quantum-visualization */
+            display: block; /* Remove extra space below canvas */
+            width: 100%;
+            height: 100%;
+        }
+
+
+        /* Snippet 2: Control Panel */
+        #control-panel-unified {
+            /* grid-area: control; Snippet 2 grid style */
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px; /* Reduced padding */
+            border: 1px solid var(--accent-color);
+            border-radius: 5px; /* Reduced radius */
+            color: white;
+            overflow-y: auto;
+            max-height: 300px; /* Example max height */
+            margin: 10px; /* Margin for spacing in .content */
+            font-family: 'Orbitron', monospace;
+        }
+        #control-panel-unified .control-group {
+            margin-bottom: 10px;
+        }
+        #control-panel-unified label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--accent-color);
+        }
+        #control-panel-unified input[type="range"],
+        #control-panel-unified input[type="text"] {
+            width: calc(100% - 20px);
+            padding: 5px;
+            background: #222;
+            border: 1px solid var(--accent-color);
+            color: white;
+            border-radius: 3px;
+        }
+        #control-panel-unified input[type="text"] {
+             margin-top: 10px;
+        }
+
+
+        /* Snippet 2: System Status (can be merged with Snippet 3's status bar) */
+        /* #system-status { ... } */ /* Will use Snippet 3's status bar */
+
+        /* Snippet 2: Module Styles */
+        .module {
+            position: absolute; /* These might need careful placement logic via JS */
+            width: 180px; /* Adjusted */
+            padding: 10px;
+            background: rgba(50, 50, 50, 0.7); /* Darker background */
+            border: 1px solid var(--accent-color);
+            border-radius: 5px;
+            text-align: center;
+            cursor: pointer;
+            color: white;
+            font-family: 'Orbitron', monospace;
+        }
+        .module:hover { background: rgba(70, 70, 70, 0.9); }
+
+        .connection { /* From Snippet 2, might be drawn by JS */
+            position: absolute;
+            width: 2px;
+            /* height: 100%; This will be dynamic */
+            background: var(--accent-color);
+            animation: flowAnimation 1s linear infinite; /* Define flowAnimation if needed */
+        }
+        @keyframes flowAnimation { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
+
+        /* Snippet 3: Specific Visualization and UI elements */
+        #visualization-canvas { /* Main canvas from Snippet 3, for D3/Three.js */
+            width: 100%;
+            height: 100%; /* Takes full space of its container in .content */
+            display: block; /* Ensure it's block */
+        }
+
+        .neural-net-display { /* From Snippet 3 */
+            /* position: absolute; bottom: 60px; left: 20px; ... */
+            padding: 10px;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid var(--accent-color);
+            margin: 10px;
+            color: white;
+        }
+
+        .status-bar { /* From Snippet 3 */
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            background: var(--secondary-bg);
+            border-top: 1px solid var(--accent-color);
+            color: white;
+            font-family: 'Orbitron', monospace;
+            width: 100%; /* Ensure full width */
+        }
+        .status-bar #system-status, .status-bar #system-time {
+            color: var(--accent-color);
+        }
+
+        .metric-panel { /* From Snippet 3 */
+            display: flex;
+            flex-wrap: wrap;
+            padding: 10px;
+            gap: 10px;
+        }
+        .metric-card { /* Style for cards if #quantum-interface becomes one */
+            background: var(--secondary-bg);
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid var(--accent-color);
+            min-width: 150px;
+            text-align: center;
+        }
+
+        .consciousness-orb, .ai-console, .thought-stream, .terminal-window, .system-chart-container { /* From Snippet 3 */
+            padding: 10px;
+            margin: 10px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--accent-color);
+            color: white;
+        }
+        .system-chart-container canvas {
+             width: 100%;
+             height: auto; /* Maintain aspect ratio */
+             max-height: 200px; /* Limit height */
+        }
+
+        /* Styles for other specific elements from snippets (e.g. neurons, polymorphism layers) */
+        #polymorphism-layer, #evolutionary-grid, #synergy-layer {
+            border: 1px dashed #ff00ff; /* Placeholder border */
+            padding: 10px;
+            margin: 10px;
+            min-height: 50px;
+            text-align: center;
+            color: #ff00ff;
+        }
+        .neuron { /* Example style for neuron divs from Snippet 2 */
+            position: absolute; /* Requires JS for positioning */
+            padding: 10px;
+            background: rgba(0, 128, 255, 0.7);
+            border: 1px solid #00ffff;
+            border-radius: 50%; /* Circular neurons */
+            color: white;
+            font-size: 12px;
+            text-align: center;
+        }
+        #documentation {
+            margin: 10px;
+            padding: 15px;
+            background: var(--secondary-bg);
+            border: 1px solid var(--accent-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #documentation h2 {
+            color: var(--accent-color);
+            font-family: 'Orbitron', monospace;
+        }
+
+    </style>
+</head>
+<body>
+  <div class="main-container">
+    <div class="sidebar">
+      <h2>System Controls</h2>
+      <!-- Snippet 3 Controls -->
+      <button id="initialize-system">Initialize</button>
+      <button id="feed-qubits">Feed Qubits</button>
+      <!-- ... other buttons from Snippet 3 ... -->
+
+      <!-- Snippet 1 UI Element -->
+      <div id="quantum-interface">
+        <h3>Quantum Understanding Core</h3>
+        <div>Semantic Depth: <span id="semantic-depth">0.0</span></div>
+        <div>Quantum Coherence: <span id="quantum-coherence">0%</span></div>
+        <div>Reasoning Status: <span id="reasoning-status">Initializing...</span></div>
+      </div>
+
+      <h2>AI Processors</h2>
+      <div id="processor-list">
+        <!-- From Snippet 3, content might be dynamic -->
+        <p>Processor A: Idle</p>
+        <p>Processor B: Active</p>
+      </div>
+    </div>
+
+    <div class="content">
+        <!-- This div will contain the main visualization and operational elements -->
+        <!-- It will house elements from all three snippets, organized as best as possible -->
+
+        <!-- Top level visualization area, could be Snippet 3's #visualization-canvas or a container for Snippet 2's viz divs -->
+        <div id="visualization-area" style="flex-grow: 1; position: relative; display: flex; flex-direction: column;">
+            <!-- Snippet 3 Main Visualization Canvas -->
+            <!-- <div id="visualization-canvas" style="border:1px solid red; height: 200px;"></div> -->
+            <!-- For now, let's assume #visualization-canvas is the primary one, or it could host the others.
+                 If #quantum-visualization and #neural-visualization are meant to be distinct and large,
+                 this area needs careful thought. For now, they are stacked.
+            -->
+
+            <!-- Snippet 2 Visualization Placeholders -->
+            <div id="quantum-visualization">
+                <canvas id="quantumVisualizationCanvas"></canvas> <!-- Canvas from Snippet 1 -->
+            </div>
+            <div id="neural-visualization" style="min-height:150px;">Neural Vis Placeholder</div>
+
+            <!-- Snippet 3 visualization canvas (can be primary or one of many) -->
+            <div id="visualization-canvas" style="border:1px solid green; min-height: 150px;">Main D3/Three Vis Canvas (S3)</div>
+        </div>
+
+
+        <!-- Other UI elements from Snippet 2, positioned within .content -->
+        <div id="unified-system"> <!-- This was the main container for S2, now integrated -->
+            <div id="polymorphism-layer">Polymorphism Layer (S2)</div>
+            <div id="evolutionary-grid">Evolutionary Grid (S2)</div>
+            <div id="synergy-layer">Synergy Layer (S2)</div>
+
+            <!-- Snippet 2 Controls - Placed in .content as per instructions -->
+            <div id="control-panel-unified">
+              <h3>ASI Controls (S2)</h3>
+              <div class="control-group">
+                <label for="learningRate">Learning Rate:</label>
+                <input type="range" id="learningRate" min="0" max="100" value="50">
+              </div>
+              <!-- ... (many other controls from snippet 2 implied) ... -->
+              <input id="command-input" type="text" placeholder="Enter command...">
+            </div>
+
+            <!-- Neuron divs etc. from Snippet 2 (example) -->
+            <div id="neuron1" class="neuron" style="top: 10px; left: 10px;">T</div> <!-- Position will be dynamic -->
+            <!-- ... (many other UI elements from snippet 2 implied) ... -->
+        </div>
+
+
+        <!-- UI Elements from Snippet 3 (already part of its .content structure) -->
+        <div class="neural-net-display" id="neural-net">Neural Network Structure (S3)</div>
+        <div class="metric-panel">
+            <!-- Example metric card -->
+            <div class="metric-card">Global Energy: <span id="global-energy">100</span></div>
+            <!-- ... other metric cards from Snippet 3 ... -->
+            <div class="metric-card">
+                <div class="metric-title">Semantic Depth (QCore)</div>
+                <div class="metric-value" id="qcore-semantic-depth">0.0</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">Quantum Coherence (QCore)</div>
+                <div class="metric-value" id="qcore-quantum-coherence">0%</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">Reasoning Status (QCore)</div>
+                <div class="metric-value" id="qcore-reasoning-status">Init...</div>
+            </div>
+        </div>
+        <div class="consciousness-orb">Consciousness Orb (S3)</div>
+        <div class="ai-console">AI Console Output... (S3)</div>
+        <div class="thought-stream" id="thought-stream">Thought Stream... (S3)</div>
+        <div class="terminal-window" id="terminal-window">Terminal... (S3)</div>
+        <div class="system-chart-container">
+            <canvas id="system-chart"></canvas> <!-- Chart from Snippet 3 -->
+        </div>
+        <div id="documentation"> <!-- From Snippet 2 -->
+          <h2>Documentation</h2>
+          <p>System documentation will appear here.</p>
+        </div>
+
+        <!-- Status Bar (From Snippet 3, typically at the bottom of .content or screen) -->
+        <div class="status-bar">
+            <div id="system-status-s3">Status (S3): Ready</div> <!-- Renamed to avoid ID clash with S1/S2 if any -->
+            <div id="system-time">(S3) Time: 00:00:00</div>
+        </div>
+    </div>
+  </div>
+
+  <!-- JavaScript Code -->
+
+  <!-- 
+  =============================================================================
+  SECTION: JavaScript from Snippet 1: QuantumUnderstandingCore
+  Origin: Snippet 1
+  Purpose: Defines the QuantumUnderstandingCore class for managing quantum
+           simulation, visualization, and TensorFlow.js model interaction.
+  =============================================================================
+  -->
+  <script type="module" id="quantumCoreScript">
+console.log("QuantumUnderstandingCore SCRIPT EXECUTED (module start)");
+
+class QuantumUnderstandingCore {
+    constructor() {
+        this.semanticDepth = 0;
+        this.quantumCoherence = 0;
+        this.reasoningStatus = 'Initializing';
+        // Ensure TF is available or wait for it
+        if (typeof tf !== 'undefined') {
+            this.initializeTensorFlowModules();
+        } else {
+            console.warn('TensorFlow.js not immediately available for QuantumUnderstandingCore. Waiting for it to load...');
+            // Optionally, defer initialization or listen for an event.
+            // For now, we assume it will be loaded by the time mainInitialize calls the constructor.
+        }
+        this.initializeQuantumVisualization(); // This depends on DOM elements
+    }
+
+    async initializeTensorFlowModules() {
+        try {
+            this.model = await this.createQuantumModel();
+            this.updateInterfaceMetrics();
+            this.updateReasoningStatus('TF Modules Ready');
+        } catch (error) {
+            console.error('TensorFlow.js Initialization Error (QuantumUnderstandingCore):', error);
+            this.updateReasoningStatus('TF Init Failed');
+        }
+    }
+
+    async createQuantumModel() {
+        try {
+            const model = tf.sequential();
+            model.add(tf.layers.dense({ inputShape: [10], units: 64, activation: 'relu', kernelInitializer: 'heNormal' }));
+            model.add(tf.layers.dense({ units: 32, activation: 'relu', kernelInitializer: 'heNormal' }));
+            model.add(tf.layers.dense({ units: 16, activation: 'softmax' }));
+            model.compile({ optimizer: 'adam', loss: 'categoricalCrossentropy', metrics: ['accuracy'] });
+            console.log('QuantumUnderstandingCore model compiled.');
+            return model;
+        } catch (error) {
+            console.error('Model Creation Error (QuantumUnderstandingCore):', error);
+            throw error;
+        }
+    }
+
+    initializeQuantumVisualization() {
+        const canvas = document.getElementById('quantumVisualizationCanvas');
+        if (!canvas) {
+            console.error('quantumVisualizationCanvas not found for QuantumUnderstandingCore!');
+            return;
+        }
+        // Ensure canvas has a non-zero size, otherwise context creation might fail or behave unexpectedly.
+        if (canvas.clientWidth === 0 || canvas.clientHeight === 0) {
+            // Attempt to set a default size or wait for layout. For now, log and proceed.
+            console.warn('quantumVisualizationCanvas has zero dimensions. Visualization might not work until resized.');
+            // canvas.width = 300; canvas.height = 150; // Example fallback
+        }
+        const ctx = canvas.getContext('2d');
+        const resizeCanvas = () => {
+            // Resize based on parent container if possible
+            const parent = canvas.parentElement;
+            if (parent) {
+                canvas.width = parent.clientWidth;
+                canvas.height = parent.clientHeight;
+            } else { // Fallback to window size if no parent or parent has no size
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            console.log(`QuantumUnderstandingCore canvas resized to ${canvas.width}x${canvas.height}`);
+        };
+        resizeCanvas(); // Initial resize
+        window.addEventListener('resize', resizeCanvas);
+        
+        let lastTime = 0;
+        const animate = (time) => {
+            if (!document.hidden) { // Only animate if tab is visible
+                if (time - lastTime > 16) { // Aim for approx 60fps
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    this.drawQuantumWaves(ctx, time);
+                    this.updateQuantumMetrics(time);
+                    lastTime = time;
+                }
+            }
+            requestAnimationFrame(animate);
+        };
+        requestAnimationFrame(animate);
+        console.log('QuantumUnderstandingCore visualization initialized.');
+    }
+
+    drawQuantumWaves(ctx, time) {
+        const centerX = ctx.canvas.width / 2;
+        const centerY = ctx.canvas.height / 2;
+        for (let i = 0; i < 10; i++) {
+            ctx.beginPath();
+            ctx.strokeStyle = `hsla(${(time * 0.01 + i * 36) % 360}, 100%, 50%, 0.5)`; // Adjusted time factor
+            ctx.lineWidth = 2;
+            for (let x = 0; x < ctx.canvas.width; x++) {
+                const angle = x * 0.05 + time * 0.0002 + i * 0.5; // Adjusted time factor
+                const y = centerY + Math.sin(angle) * (ctx.canvas.height/3) * (1 - i / 10); // Scale amplitude to canvas height
+                if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
+    }
+
+    updateQuantumMetrics(time) {
+        this.semanticDepth = Math.abs(Math.sin(time * 0.0001)) * 10; // Adjusted time factor
+        this.quantumCoherence = Math.abs(Math.cos(time * 0.0002)) * 100; // Adjusted time factor
+        this.updateInterfaceMetrics();
+    }
+
+    updateInterfaceMetrics() {
+        const semanticDepthEl = document.getElementById('semantic-depth');
+        if (semanticDepthEl) semanticDepthEl.textContent = this.semanticDepth.toFixed(2);
+        const quantumCoherenceEl = document.getElementById('quantum-coherence');
+        if (quantumCoherenceEl) quantumCoherenceEl.textContent = `${this.quantumCoherence.toFixed(2)}%`;
+        const reasoningStatusEl = document.getElementById('reasoning-status');
+        if (reasoningStatusEl) reasoningStatusEl.textContent = this.reasoningStatus || 'Active';
+
+            // New updates for Snippet 3's metric panel
+            const qcoreSemanticDepthEl = document.getElementById('qcore-semantic-depth');
+            if (qcoreSemanticDepthEl) qcoreSemanticDepthEl.textContent = this.semanticDepth.toFixed(2);
+
+            const qcoreQuantumCoherenceEl = document.getElementById('qcore-quantum-coherence');
+            if (qcoreQuantumCoherenceEl) qcoreQuantumCoherenceEl.textContent = `${this.quantumCoherence.toFixed(2)}%`;
+
+            const qcoreReasoningStatusEl = document.getElementById('qcore-reasoning-status');
+            if (qcoreReasoningStatusEl) qcoreReasoningStatusEl.textContent = this.reasoningStatus || 'Active';
+    }
+
+    updateReasoningStatus(status) {
+        this.reasoningStatus = status;
+        this.updateInterfaceMetrics();
+    }
+}
+window.QuantumUnderstandingCore = QuantumUnderstandingCore; // Assign to window object for global access
+console.log("QuantumUnderstandingCore class assigned to window.");
+  </script>
+  <!-- --- End of JavaScript from Snippet 1 --- -->
+
+  <!-- 
+  ====================================================================================================
+  SECTION: JavaScript from Snippet 2 (UnifiedSystem, Components) & Snippet 3 (UI, D3 initializations)
+  Origin: Primarily Snippet 2 for class definitions (UnifiedSystem, Module, Agents, etc.)
+          and Snippet 3 for UI control functions (initializeSystem_s3_main and its helpers).
+          Also includes the main orchestrator function mainInitialize().
+  ====================================================================================================
+  -->
+  <script>
+console.log("Bottom script tag (for mainInitialize) PARSED.");
+console.log("TEST LOG: Immediately after first log in script block.");
+
+// --- Start of JavaScript from Snippet 2: UnifiedSystem and Components ---
+
+// --- Helper Classes (must be defined before UnifiedSystem if used in constructor/init) ---
+// Module class: Represents a generic processing unit within the UnifiedSystem.
+class Module {
+    constructor(id, type = 'default') {
+        this.id = id;
+        this.type = type;
+        this.state = 'idle';
+        this.data = {};
+        this.element = null; // For DOM representation if needed
+        console.log(`Module ${id} of type ${type} created.`);
+    }
+
+    process(input) {
+        this.state = 'processing';
+        console.log(`Module ${this.id} processing input:`, input);
+        // Simulate processing
+        const output = input * Math.random();
+        this.data.lastOutput = output;
+        this.state = 'idle';
+        return output;
+    }
+
+    update(newData) {
+        this.data = { ...this.data, ...newData };
+        console.log(`Module ${this.id} updated with data:`, newData);
+    }
+}
+
+const api_s2 = { // Renamed to avoid conflict if 'api' is a global var from elsewhere
+    fetchData: async (endpoint) => {
+        console.log(`Fetching data from ${endpoint}`);
+        // Simulate API call
+        return new Promise(resolve => setTimeout(() => resolve({ data: `Data from ${endpoint}` }), 500));
+    }
+};
+
+class NeuralAgent {
+    constructor(id, learningRate = 0.01) {
+        this.id = id;
+        this.learningRate = learningRate;
+        this.model = null; // To be defined by subclasses
+        console.log(`NeuralAgent ${id} created with learningRate ${learningRate}.`);
+    }
+
+    async train(data) {
+        console.log(`NeuralAgent ${this.id} training with data:`, data);
+        // Placeholder for training logic
+        return { loss: Math.random() };
+    }
+
+    async predict(input) {
+        console.log(`NeuralAgent ${this.id} predicting for input:`, input);
+        // Placeholder for prediction logic
+        return tf.tensor([Math.random() * input.length]);
+    }
+}
+
+class AdvancedNeuralAgent extends NeuralAgent {
+    constructor(id, learningRate = 0.01, layers = [64, 32]) {
+        super(id, learningRate);
+        this.layers = layers;
+        this.initializeModel();
+        console.log(`AdvancedNeuralAgent ${id} created with layers:`, layers);
+    }
+
+    initializeModel() {
+        if (typeof tf === 'undefined') {
+            console.error("TensorFlow.js is not loaded. Cannot initialize AdvancedNeuralAgent model.");
+            return;
+        }
+        const model = tf.sequential();
+        // Assuming inputShape needs to be defined, e.g., based on expected data
+        model.add(tf.layers.dense({ inputShape: [10], units: this.layers[0] || 64, activation: 'relu' }));
+        for (let i = 1; i < this.layers.length; i++) {
+            model.add(tf.layers.dense({ units: this.layers[i], activation: 'relu' }));
+        }
+        model.add(tf.layers.dense({ units: 1, activation: 'sigmoid' })); // Example output layer
+        model.compile({ optimizer: tf.train.adam(this.learningRate), loss: 'binaryCrossentropy' });
+        this.model = model;
+        console.log(`AdvancedNeuralAgent ${this.id} model initialized.`);
+    }
+}
+
+class AdvancedRNNAgent extends NeuralAgent {
+    constructor(id, learningRate = 0.01, rnnUnits = 50) {
+        super(id, learningRate);
+        this.rnnUnits = rnnUnits;
+        this.initializeModel();
+        console.log(`AdvancedRNNAgent ${id} created with RNN units:`, rnnUnits);
+    }
+
+    initializeModel() {
+         if (typeof tf === 'undefined') {
+            console.error("TensorFlow.js is not loaded. Cannot initialize AdvancedRNNAgent model.");
+            return;
+        }
+        const model = tf.sequential();
+        // Example: inputShape [timesteps, features]
+        model.add(tf.layers.simpleRNN({ units: this.rnnUnits, inputShape: [10, 1], returnSequences: false }));
+        model.add(tf.layers.dense({ units: 1, activation: 'sigmoid' }));
+        model.compile({ optimizer: tf.train.adam(this.learningRate), loss: 'binaryCrossentropy' });
+        this.model = model;
+        console.log(`AdvancedRNNAgent ${this.id} model initialized.`);
+    }
+}
+
+class AdvancedLSTMAgent extends NeuralAgent {
+    constructor(id, learningRate = 0.01, lstmUnits = 50) {
+        super(id, learningRate);
+        this.lstmUnits = lstmUnits;
+        this.initializeModel();
+        console.log(`AdvancedLSTMAgent ${id} created with LSTM units:`, lstmUnits);
+    }
+
+    initializeModel() {
+        if (typeof tf === 'undefined') {
+            console.error("TensorFlow.js is not loaded. Cannot initialize AdvancedLSTMAgent model.");
+            return;
+        }
+        const model = tf.sequential();
+        // Example: inputShape [timesteps, features]
+        model.add(tf.layers.lstm({ units: this.lstmUnits, inputShape: [10, 1], returnSequences: false }));
+        model.add(tf.layers.dense({ units: 1, activation: 'sigmoid' }));
+        model.compile({ optimizer: tf.train.adam(this.learningRate), loss: 'binaryCrossentropy' });
+        this.model = model;
+        console.log(`AdvancedLSTMAgent ${this.id} model initialized.`);
+    }
+}
+
+class GGUFModelLoader {
+    constructor() {
+        console.log("GGUFModelLoader initialized.");
+    }
+    async loadModel(file) {
+        console.log(`GGUFModelLoader: Loading model from file ${file.name}`);
+        // This is a placeholder. Actual GGUF parsing is complex and requires specific libraries.
+        // For this simulation, we'll just return a mock structure.
+        return new Promise(resolve => {
+            setTimeout(() => {
+                resolve({ name: file.name.split('.')[0], format: 'gguf', data: 'mock_gguf_data' });
+            }, 100);
+        });
+    }
+
+    async convertToTensorflow(modelData) {
+        console.log(`GGUFModelLoader: Converting GGUF model ${modelData.name} to TensorFlow.js format.`);
+        // Placeholder for conversion. In reality, this is highly non-trivial.
+        // We'll return a simple sequential tf.js model for simulation.
+        if (typeof tf === 'undefined') {
+            console.error("TensorFlow.js is not loaded. Cannot convert GGUF model.");
+            return null;
+        }
+        const tfModel = tf.sequential();
+        tfModel.add(tf.layers.dense({ units: 10, inputShape: [5], activation: 'relu' })); // Example layer
+        tfModel.add(tf.layers.dense({ units: 1, activation: 'sigmoid' }));
+        tfModel.compile({ optimizer: 'adam', loss: 'binaryCrossentropy' });
+        console.log(`GGUFModelLoader: Mock TensorFlow.js model created for ${modelData.name}.`);
+        return tfModel;
+    }
+}
+
+
+class FractalNeuron {
+    constructor(position, scene) {
+        this.position = position;
+        this.scene = scene; // THREE.Scene
+        this.mesh = null;
+        if (typeof THREE !== 'undefined') {
+            const geometry = new THREE.SphereGeometry(0.1, 8, 8);
+            const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
+            this.mesh = new THREE.Mesh(geometry, material);
+            this.mesh.position.copy(position);
+            if (this.scene) this.scene.add(this.mesh);
+        } else {
+            console.warn("THREE.js not available for FractalNeuron.");
+        }
+    }
+    update() { /* behavior */ }
+}
+
+class FractalSystem {
+    constructor(scene, depth = 3) {
+        this.scene = scene; // THREE.Scene
+        this.depth = depth;
+        this.neurons = [];
+        console.log(`FractalSystem created with depth ${depth}.`);
+        // this.createFractal(this.depth, new THREE.Vector3(0,0,0), 5); // Initial creation might be done in UnifiedSystem
+    }
+
+    createFractal(depth, position, scale) {
+        if (typeof THREE === 'undefined') return;
+        if (depth <= 0) {
+            const neuron = new FractalNeuron(position, this.scene);
+            this.neurons.push(neuron);
+            return;
+        }
+        // Example fractal generation (simple branching)
+        for (let i = 0; i < 3; i++) {
+            const newPosition = position.clone().add(
+                new THREE.Vector3(
+                    (Math.random() - 0.5) * scale,
+                    (Math.random() - 0.5) * scale,
+                    (Math.random() - 0.5) * scale
+                )
+            );
+            this.createFractal(depth - 1, newPosition, scale * 0.5);
+        }
+    }
+    _animate() {
+        this.neurons.forEach(n => n.update());
+        // console.log("FractalSystem animating..."); // Can be noisy
+    }
+}
+
+class SynergySystem {
+    constructor(containerId = 'synergy-layer') {
+        this.containerId = containerId;
+        this.graph = { nodes: [], links: [] };
+        if (typeof d3 !== 'undefined') {
+            this.svg = d3.select(`#${containerId}`).append('svg').attr('width', '100%').attr('height', '100%');
+        } else {
+            console.warn("D3.js not available for SynergySystem.");
+        }
+        console.log(`SynergySystem initialized for container #${containerId}.`);
+    }
+    updateGraph(nodes, links) {
+        this.graph = { nodes, links };
+        if (!this.svg) return;
+        // Basic D3 update pattern (simplified)
+        this.svg.selectAll('*').remove(); // Clear previous
+        const link = this.svg.append('g').selectAll('line')
+            .data(links).enter().append('line')
+            .style('stroke', '#aaa');
+        const node = this.svg.append('g').selectAll('circle')
+            .data(nodes).enter().append('circle')
+            .attr('r', 5).style('fill', 'blue');
+        // Add simulation if needed
+    }
+}
+
+class HyperparameterOptimizer {
+    constructor(parameterSpace) {
+        this.parameterSpace = parameterSpace; // e.g., { lr: [0.001, 0.1], layers: [[32,16], [64,32,16]] }
+        console.log("HyperparameterOptimizer initialized with space:", parameterSpace);
+    }
+    optimize(agent, data) {
+        console.log(`Optimizing hyperparameters for agent ${agent.id}`);
+        // Placeholder for optimization logic (e.g., grid search, random search)
+        return { bestParams: this.parameterSpace, bestScore: Math.random() };
+    }
+}
+
+
+// --- UnifiedSystem Class ---
+class UnifiedSystem {
+    constructor() {
+        this.modules = {};
+        this.agents = [];
+        this.dataStorage = new Map(); // For storing datasets
+        this.models = new Map(); // For GGUF loaded models
+        this.fractalDepth = 3; // Default fractal depth
+
+        if (typeof THREE !== 'undefined') {
+            this.scene = new THREE.Scene();
+            this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            this.renderer = new THREE.WebGLRenderer({ antialias: true });
+            this.fractalSystem = new FractalSystem(this.scene, this.fractalDepth);
+            this.particles = null; // For particle visualization
+        } else {
+            console.warn("THREE.js not available for UnifiedSystem rendering.");
+            this.scene = null; this.camera = null; this.renderer = null; this.fractalSystem = null;
+        }
+
+        // Initialize some agents
+        for (let i = 0; i < 3; i++) {
+            this.agents.push(new AdvancedLSTMAgent(`lstm_agent_${i}`));
+        }
+        
+        this.modelLoader = new GGUFModelLoader(); // GGUFModelLoader must be defined
+        this.synergySystem = new SynergySystem('synergy-layer'); // SynergySystem must be defined
+        this.hyperOptimizer = new HyperparameterOptimizer({ lr: [0.001, 0.01], layers: [[10]] }); // HyperparameterOptimizer defined
+
+        this.initializeInternalModules(); // Add this call
+
+        console.log("UnifiedSystem constructor completed.");
+    }
+
+    getModuleDefinitions() {
+        return [
+            { id: 'tokenizeText', label: 'Tokenize Text', parameters: ['text'], type: 'textProcessor' },
+            { id: 'lemmatizeText', label: 'Lemmatize Text', parameters: ['tokens'], type: 'textProcessor' },
+            { id: 'posTagging', label: 'POS Tagging', parameters: ['tokens'], type: 'textAnalyzer' },
+            { id: 'ner', label: 'NER', parameters: ['text'], type: 'textAnalyzer' },
+            { id: 'sentimentAnalysis', label: 'Sentiment Analysis', parameters: ['text'], type: 'textAnalyzer' },
+            { id: 'topicModeling', label: 'Topic Modeling', parameters: ['corpus'], type: 'corpusProcessor' },
+            { id: 'textSummarization', label: 'Text Summarization', parameters: ['text', 'maxLength'], type: 'textGenerator' },
+            { id: 'questionAnswering', label: 'Question Answering', parameters: ['question', 'context'], type: 'reasoningEngine' },
+            { id: 'codeGeneration', label: 'Code Generation', parameters: ['prompt', 'language'], type: 'codeGenerator' },
+            { id: 'imageRecognition', label: 'Image Recognition', parameters: ['image_data'], type: 'visionProcessor' },
+            { id: 'objectDetection', label: 'Object Detection', parameters: ['image_data'], type: 'visionProcessor' },
+            { id: 'speechToText', label: 'Speech to Text', parameters: ['audio_data'], type: 'audioProcessor' },
+            { id: 'textToSpeech', label: 'Text to Speech', parameters: ['text', 'voice'], type: 'audioGenerator' },
+            { id: 'hybridAlgorithm', label: 'Hybrid Algorithm', parameters: ['inputA', 'inputB'], type: 'metaProcessor' },
+            { id: 'universalLearning', label: 'Universal Learning', parameters: ['data', 'task_description'], type: 'metaProcessor' },
+            { id: 'neurosymbolic', label: 'Neurosymbolic Reasoning', parameters: ['symbolic_input', 'neural_input'], type: 'reasoningEngine' },
+            { id: 'reinforcementLearning', label: 'Reinforcement Learning', parameters: ['state', 'action_space', 'reward_signal'], type: 'learningStrategy' },
+            { id: 'causalInference', label: 'Causal Inference', parameters: ['data', 'query'], type: 'reasoningEngine' },
+            { id: 'knowledgeGraph', label: 'Knowledge Graph Ops', parameters: ['graph_data', 'operation'], type: 'dataProcessor' }
+        ];
+    }
+
+    initializeInternalModules() {
+        console.log("UnifiedSystem: Initializing internal modules...");
+        this.modules = {}; // Ensure it's clean before populating
+        const moduleDefinitions = this.getModuleDefinitions();
+
+        moduleDefinitions.forEach(def => {
+            this.modules[def.id] = new Module(def.id, def.type || 'defaultProcessor');
+            this.modules[def.id].label = def.label; // Store label
+            this.modules[def.id].parameters = def.parameters; // Store parameters
+            // Assign other properties from original Snippet 2's module objects if relevant
+            // For example, if 'active', 'color', 'status' were part of the definition or have defaults:
+            this.modules[def.id].active = def.active !== undefined ? def.active : true; // Default to active
+            this.modules[def.id].color = def.color || '#FFFFFF'; // Default color
+            this.modules[def.id].status = def.status || 'idle'; // Default status
+            console.log(`UnifiedSystem: Initialized module - ID: ${def.id}, Type: ${this.modules[def.id].type}, Label: ${def.label}`);
+        });
+        console.log("UnifiedSystem: Internal modules initialized.", this.modules);
+    }
+
+    initEventListeners() {
+        console.log("UnifiedSystem: Initializing event listeners.");
+        const modelUploadEl = document.getElementById('model-upload'); // Assuming this exists in HTML
+        if (modelUploadEl) {
+            modelUploadEl.addEventListener('change', async (e) => {
+              const file = e.target.files[0];
+              if (file) {
+                try {
+                  showGlobalNotification('Loading model: ' + file.name, 'info');
+                  const modelData = await this.modelLoader.loadModel(file); // modelData from GGUF loader
+                  if (modelData && modelData.name) {
+                    const tfModel = await this.modelLoader.convertToTensorflow(modelData); // convert to tf.js model
+                    this.models.set(modelData.name, tfModel);
+                    console.log('Model converted and loaded into UnifiedSystem:', modelData.name);
+                    this.syncModelWithModules(modelData.name); // Example of using the model
+                    showGlobalNotification('Model loaded: ' + modelData.name, 'success');
+                  } else {
+                    console.error('UnifiedSystem: Model parsing failed or model.name is missing from GGUF loader.');
+                    showGlobalNotification('Model parsing failed', 'error');
+                  }
+                } catch (error) {
+                  console.error('UnifiedSystem: Error loading model:', error);
+                  showGlobalNotification(`Error loading model: ${error.message}`, 'error');
+                }
+              }
+            });
+        } else {
+            console.warn("UnifiedSystem: Element with ID 'model-upload' not found for event listener.");
+        }
+
+        const dataUploadEl = document.getElementById('data-upload'); // Assuming this exists
+        if (dataUploadEl) {
+            dataUploadEl.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    showGlobalNotification('Loading data: ' + file.name, 'info');
+                    const text = await file.text();
+                    const rows = text.split('\\n').map(row => row.split(',')); // Handle escaped \n if needed
+                    const processedData = preprocessGlobalData(rows); // Use global preprocessData
+                    this.dataStorage.set('userData_' + file.name, processedData);
+                    showGlobalNotification('Data loaded successfully: ' + file.name, 'success');
+                    console.log('UnifiedSystem: User data loaded:', file.name, processedData);
+                }
+            });
+        } else {
+            console.warn("UnifiedSystem: Element with ID 'data-upload' not found.");
+        }
+
+        const commandInputEl = document.getElementById('command-input'); // Assuming this exists
+        if (commandInputEl) {
+            commandInputEl.addEventListener('keydown', async (e) => {
+                if (e.key === 'Enter') {
+                    const command = e.target.value.trim();
+                    if (!command) return;
+                    showGlobalNotification(`Executing: ${command}`, 'info');
+                    const [moduleKey, ...inputParts] = command.split(' ');
+                    const input = inputParts.join(' '); // Keep input as string for more flexible handling
+                    
+                    // Example command handling
+                    if (this.modules[moduleKey]) {
+                        const result = this.modules[moduleKey].process(input);
+                        showGlobalNotification(`${moduleKey} output: ${result}`, 'success');
+                    } else if (command.startsWith('train ')) {
+                        const agentId = command.split(' ')[1];
+                        const agent = this.agents.find(a => a.id === agentId);
+                        if (agent && this.dataStorage.has('userData_default')) { // Example data key
+                           await agent.train(this.dataStorage.get('userData_default'));
+                           showGlobalNotification(`Training started for ${agentId}`, 'success');
+                        } else {
+                           showGlobalNotification(`Agent ${agentId} or data not found for training.`, 'error');
+                        }
+                    } else {
+                         showGlobalNotification(`Unknown command or module: ${moduleKey}`, 'error');
+                    }
+                    e.target.value = '';
+                }
+            });
+        } else {
+            console.warn("UnifiedSystem: Element with ID 'command-input' not found.");
+        }
+        console.log("UnifiedSystem: Event listeners initialization attempt finished.");
+    }
+    
+    createQuantumField() { // Part of UnifiedSystem, creates particles for its own scene
+        if (!this.scene || typeof THREE === 'undefined') return;
+        const particleCount = 5000;
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        const colors = new Float32Array(particleCount * 3);
+
+        for (let i = 0; i < particleCount; i++) {
+            positions[i * 3] = (Math.random() - 0.5) * 100;
+            positions[i * 3 + 1] = (Math.random() - 0.5) * 100;
+            positions[i * 3 + 2] = (Math.random() - 0.5) * 100;
+            colors[i * 3] = Math.random();
+            colors[i * 3 + 1] = Math.random();
+            colors[i * 3 + 2] = Math.random();
+        }
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        const material = new THREE.PointsMaterial({ size: 0.5, vertexColors: true });
+        this.particles = new THREE.Points(geometry, material);
+        this.scene.add(this.particles);
+        console.log("UnifiedSystem: Quantum field (particles) created.");
+    }
+
+    updateParticles() { // Part of UnifiedSystem
+        if (!this.particles || !this.particles.geometry) return;
+        const positions = this.particles.geometry.attributes.position.array;
+        const colors = this.particles.geometry.attributes.color.array;
+        const time = Date.now() * 0.0005;
+        for (let i = 0; i < positions.length; i += 3) {
+            // Example: simple circular motion + some noise
+            positions[i] = Math.sin(time + i * 0.1) * 20 + (Math.random() - 0.5) * 5;
+            positions[i+1] = Math.cos(time + i * 0.05) * 20 + (Math.random() - 0.5) * 5;
+            // positions[i+2] stays somewhat random or slowly changes
+            positions[i+2] += (Math.random() - 0.5) * 0.1;
+            if (positions[i+2] > 50 || positions[i+2] < -50) positions[i+2] *= -0.9;
+
+
+            colors[i] = Math.sin(time + i * 0.1);
+            colors[i+1] = Math.cos(time + i * 0.05);
+            colors[i+2] = Math.sin(time + i * 0.01);
+        }
+        this.particles.geometry.attributes.position.needsUpdate = true;
+        this.particles.geometry.attributes.color.needsUpdate = true;
+        // console.log("UnifiedSystem: Particles updated."); // Can be noisy
+    }
+
+
+    initVisualization() {
+        console.log("UnifiedSystem: Initializing visualization.");
+        const container = document.getElementById('neural-visualization'); // Target div for S2's Three.js
+        
+        if (this.renderer && container) {
+            // Ensure container has dimensions
+            if (container.clientWidth === 0 || container.clientHeight === 0) {
+                 console.warn("'neural-visualization' has zero dimensions. Setting default size for renderer.");
+                 // Fallback, or rely on CSS to give it size.
+                 // Forcing a size might override CSS, so be careful.
+                 // Let's assume CSS will give it dimensions eventually.
+            }
+            this.renderer.setSize(container.clientWidth || 600, container.clientHeight || 400); // Use client dimensions or fallback
+            container.appendChild(this.renderer.domElement);
+            this.camera.aspect = (container.clientWidth || 600) / (container.clientHeight || 400);
+            this.camera.updateProjectionMatrix();
+            this.camera.position.z = 50;
+
+            if (this.fractalSystem && typeof this.fractalSystem.createFractal === 'function') {
+                 this.fractalSystem.createFractal(this.fractalDepth, new THREE.Vector3(0, 0, 0), 10);
+                 console.log("UnifiedSystem: FractalSystem visualization initialized.");
+            }
+            this.createQuantumField(); // Initialize particles
+
+            // Setup resize listener for THREE.js renderer
+            window.addEventListener('resize', () => {
+                if (container && this.renderer && this.camera) {
+                    this.renderer.setSize(container.clientWidth, container.clientHeight);
+                    this.camera.aspect = container.clientWidth / container.clientHeight;
+                    this.camera.updateProjectionMatrix();
+                }
+            });
+
+        } else {
+            console.error("UnifiedSystem: Renderer or container #neural-visualization not found for Three.js visualization.");
+        }
+
+        // Initialize Chart.js for unified-stats if element exists
+        // This chart was not in the HTML, assuming it's a dynamic element or was missed.
+        // For now, I'll comment this out. If 'statsChart' canvas is added, this can be enabled.
+        /*
+        const statsChartEl = document.getElementById('statsChart'); 
+        if (statsChartEl && typeof Chart !== 'undefined') {
+            const statsCtx = statsChartEl.getContext('2d');
+            this.statsChart = new Chart(statsCtx, { 
+                type: 'line', 
+                data: { labels: [], datasets: [{ label: 'System Metric', data: [] }] },
+                options: { scales: { y: { beginAtZero: true } } }
+            });
+            console.log("UnifiedSystem: Stats chart initialized.");
+        } else {
+            console.warn("UnifiedSystem: 'statsChart' element not found or Chart.js not loaded.");
+        }
+        */
+        console.log("UnifiedSystem: Visualization initialization attempt finished.");
+    }
+    
+    syncModelWithModules(modelName) {
+        const model = this.models.get(modelName);
+        if (!model) {
+            console.error(`UnifiedSystem: Model ${modelName} not found for sync.`);
+            return;
+        }
+        // Example: Assign this model to some agents or modules
+        this.agents.forEach(agent => {
+            if (agent.model === null) { // Or some other logic for assignment
+                agent.model = model; // Note: This might overwrite specialized models in agents
+                console.log(`UnifiedSystem: Model ${modelName} synced with agent ${agent.id}`);
+            }
+        });
+    }
+
+    handleModuleInteraction(moduleKey, input) {
+        // This is a placeholder for more complex interaction logic
+        if (this.modules[moduleKey]) {
+            try {
+                const output = this.modules[moduleKey].process(input);
+                return { status: 'success', output: output };
+            } catch (error) {
+                return { status: 'error', error: error.message };
+            }
+        }
+        return { status: 'error', error: `Module ${moduleKey} not found` };
+    }
+    
+    syncModules() {
+        // Placeholder for module synchronization logic
+        // console.log("UnifiedSystem: Syncing modules...");
+    }
+
+    _animate() { // Renamed from animate
+        if (this.renderer && this.scene && this.camera) {
+             requestAnimationFrame(() => this._animate()); // Use arrow function for correct 'this'
+             
+             this.updateParticles(); // Animate particles
+             
+             if (this.fractalSystem && typeof this.fractalSystem._animate === 'function') {
+                 this.fractalSystem._animate();
+             }
+             
+             this.renderer.render(this.scene, this.camera);
+             this.syncModules(); // Call other update functions
+
+             // if (this.statsChart) { /* ... update chart data ... */ }
+        }
+    }
+
+    collectData() {
+        console.log("UnifiedSystem: Collecting data (simulated).");
+        // Simulate data collection
+        const newData = { timestamp: Date.now(), value: Math.random() };
+        this.dataStorage.set('collectedData_' + Date.now(), newData);
+
+        // Ensure 'this' is correctly bound if using setTimeout directly
+        setTimeout(() => this.collectData(), 5000); // Collect data every 5 seconds
+    }
+}
+
+// --- Global Functions from Snippet 2 (ensure they don't rely on 'this' unless bound) ---
+function launchTraining_s2() { // Renamed to avoid conflict
+    console.log("Global launchTraining_s2 called.");
+    if (window.unifiedSystem && window.unifiedSystem.agents.length > 0) {
+        const agent = window.unifiedSystem.agents[0]; // Example: train first agent
+        const data = window.unifiedSystem.dataStorage.get('userData_default'); // Example data
+        if (agent && data) {
+            agent.train(data)
+                .then(result => showGlobalNotification(`Training complete for ${agent.id}: loss ${result.loss}`, 'success'))
+                .catch(err => showGlobalNotification(`Training error for ${agent.id}: ${err}`, 'error'));
+        } else {
+            showGlobalNotification("Agent or training data not found for global launchTraining_s2.", 'warning');
+        }
+    } else {
+        showGlobalNotification("UnifiedSystem or agents not ready for global launchTraining_s2.", 'warning');
+    }
+}
+
+function resetFractal_s2() { // Renamed
+    console.log("Global resetFractal_s2 called.");
+    if (window.unifiedSystem && window.unifiedSystem.fractalSystem && typeof THREE !== 'undefined') {
+        // Clear existing fractal neurons from scene
+        if (window.unifiedSystem.fractalSystem.neurons) {
+            window.unifiedSystem.fractalSystem.neurons.forEach(neuron => {
+                if (neuron.mesh) window.unifiedSystem.scene.remove(neuron.mesh);
+            });
+        }
+        window.unifiedSystem.fractalSystem.neurons = [];
+        // Create new fractal
+        window.unifiedSystem.fractalSystem.createFractal(
+            window.unifiedSystem.fractalDepth, 
+            new THREE.Vector3(0,0,0), 
+            10
+        );
+        showGlobalNotification("Fractal system has been reset.", 'info');
+    } else {
+        showGlobalNotification("UnifiedSystem or FractalSystem not ready for reset.", 'warning');
+    }
+}
+
+// Basic Notification System (Global)
+function showGlobalNotification(message, type = 'info') {
+    // This is a very basic notification. A more robust solution would create DOM elements.
+    console.log(`[${type.toUpperCase()}] Notification: ${message}`);
+    const statusEl = document.getElementById('system-status-s3'); // Use Snippet 3's status bar
+    if (statusEl) {
+        statusEl.textContent = `Notification: ${message}`;
+        statusEl.className = `status-${type}`; // Basic styling hook
+    }
+}
+
+// Basic Data Preprocessing (Global)
+function preprocessGlobalData(data) {
+    console.log("Preprocessing global data (basic pass-through).");
+    // Example: Convert strings to numbers if applicable, clean data, etc.
+    // For now, just returns data as is.
+    return data.map(row => row.map(cell => {
+        const num = parseFloat(cell);
+        return isNaN(num) ? cell : num;
+    }));
+}
+
+// Placeholder for other global functions from Snippet 2
+function activateModule_s2(moduleName) { console.log(`Global activateModule_s2: ${moduleName}`); }
+function deactivateModule_s2(moduleName) { console.log(`Global deactivateModule_s2: ${moduleName}`); }
+function toggleModule_s2(moduleName) { console.log(`Global toggleModule_s2: ${moduleName}`); }
+
+// D3 drag functions (if used globally, otherwise they should be part of a D3-specific class/module)
+// function dragstarted_s2(event, d) { /* ... */ }
+// function dragged_s2(event, d) { /* ... */ }
+// function dragended_s2(event, d) { /* ... */ }
+
+console.log("Snippet 2 (UnifiedSystem and components) script block processed.");
+console.log("TEST LOG: After all Snippet 2 code.");
+// --- End of JavaScript from Snippet 2 ---
+
+// --- Start of JavaScript from Snippet 3: UI, D3, Chart.js initializations & Controls ---
+// Note: These functions are typically called by initializeSystem_s3_main()
+
+// Global-like variables for Snippet 3's UI state
+let activeProcessors_s3 = ['Processor A', 'Processor B'];
+let systemStatus_s3 = 'Initializing...';
+let consciousnessLevel_s3 = 30;
+let thoughtStream_s3 = ['System boot sequence initiated.', 'Awaiting user input.'];
+let systemChart_s3 = null; // To hold Chart.js instance
+
+function initVisualization_s3() {
+    console.log("Snippet 3: Initializing D3 Visualization (#visualization-canvas)");
+    const canvasDiv = document.getElementById('visualization-canvas'); // This is the S3 specific canvas
+    if (!canvasDiv) {
+        console.error("Snippet 3: #visualization-canvas div not found for D3!");
+        return;
+    }
+    // Example D3 setup: just add an SVG and a circle
+    if (typeof d3 !== 'undefined') {
+        const svg = d3.select(canvasDiv).append("svg")
+            .attr("width", canvasDiv.clientWidth || 300)
+            .attr("height", canvasDiv.clientHeight || 150);
+
+        svg.append("circle")
+            .attr("cx", (canvasDiv.clientWidth || 300) / 2)
+            .attr("cy", (canvasDiv.clientHeight || 150) / 2)
+            .attr("r", 20)
+            .style("fill", "var(--accent-color)");
+        console.log("Snippet 3: D3 visualization initialized on #visualization-canvas.");
+    } else {
+        console.warn("Snippet 3: D3.js not loaded, skipping D3 visualization.");
+        canvasDiv.innerHTML = "<p>D3.js not loaded. Visualization unavailable.</p>";
+    }
+}
+
+function initializeNeuralNetwork_s3() {
+    console.log("Snippet 3: Initializing Neural Network Display (#neural-net)");
+    const nnDisplay = document.getElementById('neural-net');
+    if (nnDisplay) {
+        nnDisplay.innerHTML = '<p>Neural Network Structure: [Input Layer] -> [Hidden Layer 1] -> [Output Layer]</p>';
+        // Add more complex DOM elements to represent neurons and connections
+        console.log("Snippet 3: Neural network display initialized.");
+    } else {
+        console.error("Snippet 3: #neural-net div not found!");
+    }
+}
+
+function feedQubits_s3() {
+    console.log("Snippet 3: feedQubits_s3 called.");
+    consciousnessLevel_s3 = Math.min(100, consciousnessLevel_s3 + 5);
+    thoughtStream_s3.push(`Qubit stream processed. Consciousness level: ${consciousnessLevel_s3}`);
+    updateMetrics_s3();
+    // Add D3 updates if visualization-canvas is D3 controlled and needs to react
+    showGlobalNotification("Qubits fed into the system.", "info");
+}
+
+function initAIConsole_s3() {
+    console.log("Snippet 3: Initializing AI Console");
+    const consoleEl = document.querySelector('.ai-console'); // Using class from HTML
+    if (consoleEl) {
+        consoleEl.innerHTML = thoughtStream_s3.map(t => `<p>${t}</p>`).join('');
+        console.log("Snippet 3: AI console initialized.");
+    } else {
+        console.warn("Snippet 3: .ai-console element not found.");
+    }
+}
+
+function initTerminal_s3() {
+    console.log("Snippet 3: Initializing Terminal");
+    const terminalEl = document.getElementById('terminal-window');
+    if (terminalEl) {
+        terminalEl.innerHTML = '<p>Terminal ready. Type "help" for commands.</p>';
+        // Add input field and command handling logic if needed
+        console.log("Snippet 3: Terminal initialized.");
+    } else {
+        console.warn("Snippet 3: #terminal-window element not found.");
+    }
+}
+
+function initSystemChart_s3() {
+    console.log("Snippet 3: Initializing System Chart (#system-chart)");
+    const chartCanvas = document.getElementById('system-chart');
+    if (chartCanvas && typeof Chart !== 'undefined') {
+        const ctx = chartCanvas.getContext('2d');
+        systemChart_s3 = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['T-5', 'T-4', 'T-3', 'T-2', 'T-1', 'Now'],
+                datasets: [{
+                    label: 'Consciousness Level',
+                    data: [10, 20, 25, 30, 35, consciousnessLevel_s3],
+                    borderColor: 'var(--accent-color)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+        console.log("Snippet 3: System chart initialized.");
+    } else {
+        console.warn("Snippet 3: #system-chart canvas not found or Chart.js not loaded.");
+    }
+}
+
+function updateTime_s3() {
+    const timeEl = document.getElementById('system-time');
+    if (timeEl) {
+        timeEl.textContent = `Time: ${new Date().toLocaleTimeString()}`;
+    }
+}
+
+function updateStatus_s3() {
+    const statusEl = document.getElementById('system-status-s3'); // S3 specific status
+    if (statusEl) {
+        statusEl.textContent = `Status (S3): ${systemStatus_s3}`;
+    }
+     // Update processor list display
+    const processorListEl = document.getElementById('processor-list');
+    if (processorListEl) {
+        processorListEl.innerHTML = activeProcessors_s3.map(p => `<p>${p}: ${Math.random() > 0.5 ? 'Active' : 'Idle'}</p>`).join('');
+    }
+}
+
+function updateMetrics_s3() {
+    // Update consciousness level in chart
+    if (systemChart_s3) {
+        systemChart_s3.data.datasets[0].data.push(consciousnessLevel_s3);
+        if (systemChart_s3.data.datasets[0].data.length > 10) { // Keep last 10 points
+            systemChart_s3.data.datasets[0].data.shift();
+        }
+        systemChart_s3.update();
+    }
+    // Update thought stream in AI console
+    const consoleEl = document.querySelector('.ai-console');
+    if (consoleEl) {
+        consoleEl.innerHTML = thoughtStream_s3.slice(-5).map(t => `<p>${t}</p>`).join(''); // Show last 5 thoughts
+    }
+    // Update other metrics like global energy (if dynamic)
+    const energyEl = document.getElementById('global-energy');
+    if(energyEl) energyEl.textContent = (Math.random() * 100 + 50).toFixed(0);
+
+    console.log("Snippet 3: Metrics updated.");
+}
+
+
+function initSystemControls_s3() {
+    console.log("Snippet 3: Initializing System Controls");
+    const initBtn = document.getElementById('initialize-system');
+    if (initBtn) {
+        initBtn.addEventListener('click', () => {
+            systemStatus_s3 = 'System Initialized by S3 Button';
+            updateStatus_s3();
+            showGlobalNotification('System manually initialized via S3 button!', 'success');
+            thoughtStream_s3.push('System manually initialized.');
+            initAIConsole_s3(); // Refresh console
+        });
+    }
+    const feedQubitsBtn = document.getElementById('feed-qubits');
+    if (feedQubitsBtn) {
+        feedQubitsBtn.addEventListener('click', feedQubits_s3);
+    }
+    console.log("Snippet 3: System controls initialized.");
+}
+
+// This is the main entry for Snippet 3's specific initializations
+function initializeSystem_s3_main() {
+    console.log("Snippet 3: initializeSystem_s3_main called.");
+    initVisualization_s3();      // D3 vis for #visualization-canvas
+    initializeNeuralNetwork_s3(); // DOM-based neural net display in #neural-net
+    initAIConsole_s3();
+    initTerminal_s3();
+    initSystemChart_s3();        // Chart.js for #system-chart
+    initSystemControls_s3();     // Event listeners for S3 buttons
+
+    updateTime_s3(); // Initial time update
+    setInterval(updateTime_s3, 1000);
+    setInterval(updateMetrics_s3, 3000); // Update metrics more frequently
+    updateStatus_s3(); // Initial status update
+    console.log("Snippet 3: System initialization complete. Intervals set.");
+}
+
+console.log("Snippet 3 (UI and D3 components) script block processed.");
+console.log("TEST LOG: After all Snippet 3 code.");
+// --- End of JavaScript from Snippet 3 ---
+
+// --- Main Initialization Orchestrator ---
+console.log("TEST LOG: Before mainInitialize function definition.");
+
+/**
+ * Main initialization function for the Unified ASI Monitor.
+ * Orchestrates the instantiation and setup of components from all snippets.
+ */
+function mainInitialize() {
+    console.log("mainInitialize FUNCTION CALLED.");
+    try {
+        console.log("mainInitialize: try block entered.");
+
+        // Step 1: Initialize QuantumUnderstandingCore (from Snippet 1)
+        // This core handles quantum simulation aspects and its own visualization.
+        // It's expected to be available on the window object.
+        console.log("mainInitialize: Attempting to initialize QuantumUnderstandingCore (Snippet 1)...");
+        if (typeof window.QuantumUnderstandingCore === 'undefined') {
+            console.error("ERROR: window.QuantumUnderstandingCore is UNDEFINED before instantiation attempt.");
+            throw new Error("QuantumUnderstandingCore is not defined on window object. Module script (Snippet 1) might have failed or not run yet.");
+        }
+        console.log("mainInitialize: QuantumUnderstandingCore IS defined on window. Attempting new window.QuantumUnderstandingCore().");
+        window.quantumCore = new window.QuantumUnderstandingCore(); // Instantiated here
+        console.log("mainInitialize: QuantumUnderstandingCore instantiated successfully.");
+
+        // Step 2: Initialize UnifiedSystem (from Snippet 2)
+        // This system manages various AI modules, agents, and its own visualizations.
+        console.log("mainInitialize: Initializing UnifiedSystem (Snippet 2)...");
+        window.unifiedSystem = new UnifiedSystem(); // Assumes UnifiedSystem class is available from Snippet 2 code in this script block
+        window.unifiedSystem.initEventListeners();  // Setup event listeners defined in UnifiedSystem
+        window.unifiedSystem.initVisualization(); // Initialize visualizations specific to UnifiedSystem (e.g., Three.js in #neural-visualization)
+        console.log("mainInitialize: UnifiedSystem initialized and its visualization/event listeners started.");
+
+        // Step 3: Initialize UI components and visualizations from Snippet 3
+        // This involves D3.js, Chart.js, and other UI elements specific to Snippet 3's design.
+        console.log("mainInitialize: Initializing Snippet 3 components (UI, D3, Charts)...");
+        initializeSystem_s3_main(); // Calls the main setup function from Snippet 3
+        console.log("mainInitialize: Snippet 3 components initialized.");
+
+        // Step 4: Start main animation loops
+        console.log("mainInitialize: Starting animation loops...");
+        if (window.unifiedSystem && typeof window.unifiedSystem._animate === 'function') {
+            window.unifiedSystem._animate(); // Starts UnifiedSystem's Three.js animation loop (if renderer is available)
+            console.log("mainInitialize: UnifiedSystem animation loop started.");
+        } else {
+            console.warn("mainInitialize: UnifiedSystem._animate method not found or system not initialized properly for animation.");
+        }
+        // Note: QuantumUnderstandingCore starts its own animation loop internally upon instantiation.
+
+        // Step 5: Start data collection loops (if any)
+        if (window.unifiedSystem && typeof window.unifiedSystem.collectData === 'function') {
+            window.unifiedSystem.collectData(); // Start data collection for UnifiedSystem
+            console.log("mainInitialize: UnifiedSystem data collection started.");
+        }
+
+        console.log("mainInitialize: All systems initialized successfully.");
+        showGlobalNotification("Unified ASI Monitor fully initialized and operational.", "success");
+        document.title = "ASI Monitor - Operational"; // Update page title to reflect operational status
+
+    } catch (error) {
+        console.error("MAIN INITIALIZATION ERROR CATCH BLOCK ENTERED.");
+    console.error("Error toString():", error.toString()); // Simplified error logging
+    if (error.name) console.error("Error Name:", error.name);
+    if (error.message) console.error("Error Message:", error.message);
+    if (error.stack) console.error("Error Stack:", error.stack);
+    showGlobalNotification(`CRITICAL ERROR during mainInitialize: ${error.toString()}`, "error"); // Use toString()
+        const bodyEl = document.querySelector('body');
+        if (bodyEl) {
+        // Ensure the message itself doesn't cause an error if error.message is weird
+        const errMessage = error && error.message ? error.message : "Unknown error structure";
+            bodyEl.innerHTML = `<div style="color:red; padding:20px; font-size:24px;">Critical Initialization Error: ${error.message}. See console for details.</div>`;
+        }
+    }
+}
+
+// Call mainInitialize after the DOM is fully loaded
+console.log("TEST LOG: Before addEventListener for DOMContentLoaded.");
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("DOMContentLoaded event fired. Calling mainInitialize...");
+    mainInitialize(); // The try-catch for this call was added in a previous step, keeping it
+});
+console.log("TEST LOG: After addEventListener for DOMContentLoaded. Listener registered.");
+  </script>
+  <!-- --- End of Main Initialization Orchestrator & Combined Snippet 2/3 Script --- -->
+</body>
+</html>
